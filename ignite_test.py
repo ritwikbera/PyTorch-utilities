@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from torch.optim import SGD
 from torch.utils.tensorboard import SummaryWriter
 from ignite.engine import Engine, Events
+from ignite.metrics import Loss, RunningAverage
 
 class MyDataset(Dataset):
     def __init__(self):
@@ -51,9 +52,13 @@ def run(args):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     epochs = args.epochs
 
+    model.to(device)
+    model.train()
+
     def train_step(engine, batch):
         optimizer.zero_grad()
         data, output = batch 
+        data, output = data.to(device), output.to(device)
         criterion = nn.MSELoss()
         loss = criterion(output, model(data))
         O = loss.item()
@@ -63,6 +68,8 @@ def run(args):
         return O 
 
     trainer = Engine(train_step)
+
+    RunningAverage(output_transform=lambda x: x).attach(trainer, 'loss')
 
     @trainer.on(Events.ITERATION_COMPLETED)
     def log_loss(engine):
@@ -81,6 +88,7 @@ def run(args):
     @trainer.on(Events.EPOCH_COMPLETED)
     def act(engine):
         print('EPOCH_COMPLETED, DO SOMETHING ELSE')
+        print('Smoothed Loss {:2f}'.format(engine.state.metrics['loss']))
 
     trainer.run(dataloader, args.epochs)
 
