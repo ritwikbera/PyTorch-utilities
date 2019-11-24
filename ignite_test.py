@@ -8,11 +8,12 @@ from torch.optim import SGD
 from torch.utils.tensorboard import SummaryWriter
 from ignite.engine import Engine, Events
 from ignite.metrics import Loss, RunningAverage
+from handlers import Progbar
 
 class MyDataset(Dataset):
     def __init__(self):
-        self.data = torch.randn(500,10)
-        self.output = torch.randn(500,10)
+        self.data = torch.randn(5000,10)
+        self.output = torch.randn(5000,10)
 
     def __len__(self):
         return len(self.data)
@@ -69,7 +70,11 @@ def run(args):
 
     trainer = Engine(train_step)
 
-    RunningAverage(output_transform=lambda x: x).attach(trainer, 'loss')
+    RunningAverage(output_transform=lambda x: x).attach(trainer, 'smooth loss')
+        
+    progress_bar = Progbar(loader=dataloader)
+    
+    trainer.add_event_handler(event_name=Events.ITERATION_COMPLETED, handler=progress_bar)
 
     @trainer.on(Events.ITERATION_COMPLETED)
     def log_loss(engine):
@@ -88,7 +93,7 @@ def run(args):
     @trainer.on(Events.EPOCH_COMPLETED)
     def act(engine):
         print('EPOCH_COMPLETED, DO SOMETHING ELSE')
-        print('Smoothed Loss {:2f}'.format(engine.state.metrics['loss']))
+        # print('Smoothed Loss {:2f}'.format(engine.state.metrics['smooth loss']))
 
     trainer.run(dataloader, args.epochs)
 
